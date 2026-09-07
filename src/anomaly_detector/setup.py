@@ -21,6 +21,7 @@ setup(
     entry_points={
         'console_scripts': [
             'camera_node = anomaly_detector.camera_node:main',
+            'inference_node = anomaly_detector.inference_node:main',
         ],
     },
 )
