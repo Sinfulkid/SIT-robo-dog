@@ -3,3 +3,8 @@ install/
 log/
 .colcon*
 .vscode/
+dataset/
+runs/
+venv
+weights/
+*.pt
