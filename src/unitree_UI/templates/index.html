@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Unitree Go2 EDU Dashboard</title>
+    <style>
+        body {
+            background-color: #121212;
+            color: #ffffff;
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin: 0;
+            padding: 30px;
+        }
+        .dashboard-grid {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin-top: 20px;
+        }
+        .panel {
+            background-color: #1e1e1e;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+        }
+        img {
+            width: 640px;
+            height: 480px;
+            background: #000;
+            border: 1px solid #333;
+            border-radius: 4px;
+        }
+        .controls-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            min-width: 250px;
+        }
+        button {
+            padding: 12px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            background-color: #007acc;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            transition: background 0.2s;
+        }
+        button:hover {
+            background-color: #005999;
+        }
+        .status-box {
+            font-size: 14px;
+            color: #4CAF50;
+            background: #111;
+            padding: 10px;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Unitree Go2 EDU Control Panel</h1>
+
+    <div class="dashboard-grid">
+        <!-- Video Panel -->
+        <div class="panel">
+            <h3>Live Camera Feed</h3>
+            <!-- Pulls directly from the robot video feed endpoint -->
+            <img src="{{ robot_stream }}" alt="Stream Offline" />
+        </div>
+
+        <!-- Extensible Controls Panel -->
+        <div class="panel controls-panel">
+            <h3>Robot Commands</h3>
+            <button onclick="sendCommand('stand')">Stand Up</button>
+            <button onclick="sendCommand('sit')">Sit Down</button>
+            <button onclick="sendCommand('zero')">Damp / Zero Pose</button>
+            
+            <div class="status-box">
+                Status: <span id="status-text">Connected</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function sendCommand(action) {
+            console.log("Sending command: " + action);
+            // You can expand this later to use fetch() to send POST requests to your Python backend
+            alert("Command sent: " + action);
+        }
+    </script>
+
+</body>
+</html>
