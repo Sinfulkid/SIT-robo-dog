@@ -2,97 +2,69 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Unitree Go2 EDU Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unitree Go2 Mission Control</title>
     <style>
-        body {
-            background-color: #121212;
-            color: #ffffff;
-            font-family: Arial, sans-serif;
-            text-align: center;
-            margin: 0;
-            padding: 30px;
+        :root {
+            --bg-color: #0d0f12;
+            --card-color: #1a1f26;
+            --accent-color: #00ff66;
+            --text-color: #ffffff;
         }
-        .dashboard-grid {
-            display: flex;
-            justify-content: center;
-            gap: 20px;
-            flex-wrap: wrap;
-            margin-top: 20px;
-        }
-        .panel {
-            background-color: #1e1e1e;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
-        }
-        img {
-            width: 640px;
-            height: 480px;
-            background: #000;
-            border: 1px solid #333;
-            border-radius: 4px;
-        }
-        .controls-panel {
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-            min-width: 250px;
-        }
-        button {
-            padding: 12px;
-            font-size: 16px;
-            font-weight: bold;
-            cursor: pointer;
-            background-color: #007acc;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            transition: background 0.2s;
-        }
-        button:hover {
-            background-color: #005999;
-        }
-        .status-box {
-            font-size: 14px;
-            color: #4CAF50;
-            background: #111;
-            padding: 10px;
-            border-radius: 4px;
-        }
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg-color); color: var(--text-color); margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
+        h1 { color: var(--accent-color); margin-bottom: 5px; text-transform: uppercase; letter-spacing: 2px; }
+        .dashboard { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; width: 90%; max-width: 1200px; margin-top: 20px; }
+        .panel { background: var(--card-color); border: 1px solid #2d3748; border-radius: 12px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        .video-feed { width: 100%; height: auto; border-radius: 8px; border: 2px solid #2d3748; display: block; background: #000; }
+        .controls-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 15px; }
+        .btn { background: #2d3748; color: white; border: none; padding: 12px; border-radius: 6px; font-weight: bold; cursor: pointer; transition: all 0.2s; text-transform: uppercase; }
+        .btn:hover { background: var(--accent-color); color: #000; transform: translateY(-2px); }
+        .btn-stop { background: #e53e3e; }
+        .btn-stop:hover { background: #fc8181; color: white; }
+        .telemetry-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #2d3748; font-size: 14px; }
+        .telemetry-val { color: var(--accent-color); font-family: monospace; }
     </style>
 </head>
 <body>
 
-    <h1>Unitree Go2 EDU Control Panel</h1>
+    <h1>Unitree Go2 Control Dashboard</h1>
+    <p>System Connection: <span style="color: var(--accent-color); font-weight: bold;">ONLINE</span></p>
 
-    <div class="dashboard-grid">
-        <!-- Video Panel -->
+    <div class="dashboard">
+        <!-- LEFT PANEL: Visual Feed -->
         <div class="panel">
-            <h3>Live Camera Feed</h3>
-            <!-- Pulls directly from the robot video feed endpoint -->
-            <img src="{{ robot_stream }}" alt="Stream Offline" />
+            <h2 style="margin-top:0;">🎥 Primary Camera Stream</h2>
+            <img class="video-feed" src="/video_feed" alt="Go2 Camera Feed" />
         </div>
 
-        <!-- Extensible Controls Panel -->
-        <div class="panel controls-panel">
-            <h3>Robot Commands</h3>
-            <button onclick="sendCommand('stand')">Stand Up</button>
-            <button onclick="sendCommand('sit')">Sit Down</button>
-            <button onclick="sendCommand('zero')">Damp / Zero Pose</button>
+        <!-- RIGHT PANEL: Controls & Telemetry Data -->
+        <div class="panel">
+            <h2 style="margin-top:0;">🕹️ Robot Diagnostics</h2>
             
-            <div class="status-box">
-                Status: <span id="status-text">Connected</span>
+            <!-- Telemetry Status Placeholders -->
+            <div class="telemetry-item"><span>Battery Charge</span><span class="telemetry-val">84%</span></div>
+            <div class="telemetry-item"><span>Locomotion Mode</span><span class="telemetry-val">Stand / Walk</span></div>
+            <div class="telemetry-item"><span>Network Latency</span><span class="telemetry-val">4ms</span></div>
+
+            <h3 style="margin-top:25px;">⚡ Command Shortcuts</h3>
+            <div class="controls-grid">
+                <button class="btn" onclick="sendCommand('stand')">Stand Up</button>
+                <button class="btn" onclick="sendCommand('sit')">Sit Down</button>
+                <button class="btn" onclick="sendCommand('dance')">Dance Mode</button>
+                <button class="btn btn-stop" onclick="sendCommand('stop')">Emergency Stop</button>
             </div>
         </div>
     </div>
 
     <script>
+        // Simple JavaScript helper to shoot command paths back to your Python script instantly
         function sendCommand(action) {
-            console.log("Sending command: " + action);
-            // You can expand this later to use fetch() to send POST requests to your Python backend
-            alert("Command sent: " + action);
+            console.log("Executing Action:", action);
+            fetch('/api/command/' + action)
+                .then(response => response.json())
+                .then(data => alert("Robot Response: " + data.status))
+                .catch(err => console.error("Action execution failed:", err));
         }
     </script>
-
 </body>
 </html>
