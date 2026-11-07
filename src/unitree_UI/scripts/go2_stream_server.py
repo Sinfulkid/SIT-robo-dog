@@ -5,7 +5,7 @@ app = Flask(__name__)
 
 # Unitree Go2 default RTP/H.264 multicast stream via GStreamer
 GST_PIPELINE = (
-    "udpsrc address=230.1.1.1 port=1720 multicast-iface=eth0 ! "
+    "udpsrc address=230.1.1.1 port=1720 multicast-iface=eth10 ! "
     "application/x-rtp, media=video, encoding-name=H264 ! "
     "rtph264depay ! h264parse ! avdec_h264 ! videoconvert ! "
     "video/x-raw, format=BGR ! appsink drop=1"
