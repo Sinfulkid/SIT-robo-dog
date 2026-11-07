@@ -1,53 +1,60 @@
+import rclpy
+from rclpy.node import Node
+from unitree_go.msg import Go2FrontVideoData
 import cv2
-from flask import Flask, Response, jsonify
+import numpy as np
+import threading
+from flask import Flask, Response
 
 app = Flask(__name__)
+latest_frame = None
+frame_lock = threading.Lock()
 
-# Unitree Go2 default RTP/H.264 multicast stream via GStreamer
-GST_PIPELINE = (
-    "udpsrc address=230.1.1.1 port=1720 multicast-iface=eth10 ! "
-    "application/x-rtp, media=video, encoding-name=H264 ! "
-    "rtph264depay ! h264parse ! avdec_h264 ! videoconvert ! "
-    "video/x-raw, format=BGR ! appsink drop=1"
-)
+class VideoSubscriber(Node):
+    def __init__(self):
+        super().__init__('go2_web_video_subscriber')
+        self.subscription = self.create_subscription(
+            Go2FrontVideoData,
+            '/frontvideostream',
+            self.listener_callback,
+            10
+        )
 
-def generate_mjpeg_stream():
-    # Open video stream using GStreamer backend
-    cap = cv2.VideoCapture(GST_PIPELINE, cv2.CAP_GSTREAMER)
+    def listener_callback(self, msg):
+        global latest_frame
+        try:
+            # Convert raw byte payload from Go2FrontVideoData to numpy array and decode JPEG/H264 frame
+            np_arr = np.frombuffer(msg.data, dtype=np.uint8)
+            frame = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+            if frame is not None:
+                with frame_lock:
+                    latest_frame = frame.copy()
+        except Exception as e:
+            pass
 
-    # Fallback to physical camera device if multicast fails
-    if not cap.isOpened():
-        print("[WARN] GStreamer pipeline failed. Falling back to VideoCapture(0)")
-        cap = cv2.VideoCapture(0)
-
-    print("[INFO] Stream server active.")
-
-    while cap.isOpened():
-        success, frame = cap.read()
-        if not success:
-            continue
-        
-        # Compress frame to JPEG for fast HTTP transfer
-        ret, buffer = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
-        if not ret:
-            continue
-
-        frame_bytes = buffer.tobytes()
-
-        # Yield frame as part of an MJPEG continuous stream
-        yield (b'--frame\r\n'
-               b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
-
-    cap.release()
+def ros_thread():
+    rclpy.init()
+    node = VideoSubscriber()
+    rclpy.spin(node)
+    node.destroy_node()
+    rclpy.shutdown()
 
 @app.route('/video_feed')
 def video_feed():
-    return Response(generate_mjpeg_stream(), mimetype='multipart/x-mixed-replace; boundary=frame')
-
-@app.route('/api/status')
-def status():
-    return jsonify({"status": "online", "robot": "Unitree Go2 EDU"})
+    def generate():
+        while True:
+            with frame_lock:
+                if latest_frame is None:
+                    continue
+                success, encoded = cv2.imencode('.jpg', latest_frame)
+                if not success:
+                    continue
+                frame_bytes = encoded.tobytes()
+            yield (b'--frame\r\n'
+                   b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+    return Response(generate(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
 if __name__ == '__main__':
-    # Host on all network interfaces on port 5000
-    app.run(host='0.0.0.0', port=5000, threaded=True)
+    t = threading.Thread(target=ros_thread, daemon=True)
+    t.start()
+    app.run(host='0.0.0.0', port=5000)
