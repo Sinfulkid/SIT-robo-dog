@@ -1,5 +1,6 @@
 import io
 import socket
+import struct
 import threading
 import av
 import cv2
@@ -7,25 +8,32 @@ from flask import Flask, Response, render_template
 
 app = Flask(__name__)
 
-latest_points_bytes = b""
+# Default identity quaternion [w=1.0, x=0.0, y=0.0, z=0.0]
+latest_quat_bytes = struct.pack('<4f', 1.0, 0.0, 0.0, 0.0)
+latest_points_bytes = latest_quat_bytes
 points_lock = threading.Lock()
 
 
 def udp_lidar_listener():
-    global latest_points_bytes
+    global latest_quat_bytes, latest_points_bytes
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     sock.bind(("0.0.0.0", 9876))
-    print("[3D SLAM UDP] Listening on port 9876...")
+    print("[3D SLAM + IMU UDP] Listening on port 9876...")
 
     scan_history = []
     while True:
         data, _ = sock.recvfrom(65535)
-        scan_history.append(data)
-        if len(scan_history) > 5:  # Merge last 5 packets (~15,000-20,000 3D points)
+        if len(data) <= 16:
+            continue
+
+        latest_quat_bytes = data[:16]
+        scan_history.append(data[16:])
+        if len(scan_history) > 5:
             scan_history.pop(0)
+
         with points_lock:
-            latest_points_bytes = b"".join(scan_history)
+            latest_points_bytes = latest_quat_bytes + b"".join(scan_history)
 
 
 def generate_camera_frames():

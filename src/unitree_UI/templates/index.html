@@ -104,8 +104,8 @@
     </div>
 
     <!-- Local Offline Three.js & OrbitControls -->
-    <script src="https://cloudflare.com"></script> <!-- /static/js/three.min.js -->
-    <script src="https://jsdelivr.net"></script> <!-- /static/js/OrbitControl.js -->
+    <script src="/static/js/three.min.js"></script> <!-- /static/js/three.min.js or https://cloudflare.com -->
+    <script src="/static/js/OrbitControls.js"></script> <!-- /static/js/OrbitControls.js or https://jsdelivr.net-->
     <script>
         const container = document.getElementById('slam-3d-container');
         const scene = new THREE.Scene();
@@ -131,11 +131,11 @@
 
         // Simple 3D Go2 body representation at origin
         const robotGroup = new THREE.Group();
-        const bodyMat = new THREE.MeshBasicMaterial({ color: 0x111111 });
-        const trimMat = new THREE.MeshBasicMaterial({ color: 0x00ff66 });
-        const body = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.18, 0.28), bodyMat);
-        const headStripe = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.19, 0.29), trimMat);
-        headStripe.position.x = 0.28;
+        const bodyMat = new THREE.MeshBasicMaterial({ color: 0xff6600 });
+        const trimMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+        const body = new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.22, 0.32), bodyMat);
+        const headStripe = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.23, 0.33), trimMat);
+        headStripe.position.x = 0.34;
         robotGroup.add(body, headStripe);
 
         // 4 legs
@@ -145,19 +145,27 @@
             leg.position.set(...pos);
             robotGroup.add(leg);
         });
+        robotGroup.position.set(0, 0.05, 0);
         scene.add(robotGroup);
 
         // Instanced 3D Voxel Cubes (up to 20,000 voxels at 60 FPS)
         const MAX_VOXELS = 20000;
         const voxelGeo = new THREE.BoxGeometry(0.08, 0.08, 0.08);
-        const voxelMat = new THREE.MeshBasicMaterial();
+        const voxelMat = new THREE.MeshBasicMaterial({ color:0x00e5ff });
         const instancedMesh = new THREE.InstancedMesh(voxelGeo, voxelMat, MAX_VOXELS);
         instancedMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+        
+        const colorArray = new Float32Array(MAX_VOXELS * 3);
+        const colorAttribute = new THREE.InstancedBufferAttribute(colorArray, 3);
+        colorAttribute.setUsage(THREE.DynamicDrawUsage);
+        instancedMesh.instanceColor = colorAttribute;
+        
         scene.add(instancedMesh);
 
         const dummy = new THREE.Object3D();
         const color = new THREE.Color();
-
+        const targetQuat = new THREE.Quaternion();
+	
         function setHeightColor(z, targetColor) {
             const norm = Math.max(0, Math.min(1, (z + 0.35) / 1.65));
             const hue = (0.38 - norm * 0.52 + 1.0) % 1.0;
@@ -169,6 +177,16 @@
                 const res = await fetch('/slam_points');
                 const buf = await res.arrayBuffer();
                 const floats = new Float32Array(buf);
+                if (floats.length < 4) return;
+
+                const qw = floats[0];
+                const qx = floats[1];
+                const qy = floats[2];
+                const qz = floats[3];
+
+                targetQuat.set(qx, qz, -qy, qw).normalize();
+                
+                const pointFloats = floats.subarray(4);
                 const count = Math.min(MAX_VOXELS, Math.floor(floats.length / 3));
 
                 for (let i = 0; i < count; i++) {
@@ -177,8 +195,8 @@
                     const rz = floats[i * 3 + 2];
 
                     const vx = Math.round(rx / 0.08) * 0.08;
-                    const vy = Math.round(rz / 0.08) * 0.08;
-                    const vz = Math.round(-ry / 0.08) * 0.08;
+                    const vy = Math.round(-rz / 0.08) * 0.08;
+                    const vz = Math.round(ry / 0.08) * 0.08;
 
                     dummy.position.set(vx, vy, vz);
                     dummy.updateMatrix();
@@ -198,6 +216,7 @@
 
         function animate() {
             requestAnimationFrame(animate);
+            robotGroup.quarternion.slerp(targetQuat, 0.25);
             controls.update();
             renderer.render(scene, camera);
         }
