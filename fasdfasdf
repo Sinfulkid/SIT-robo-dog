@@ -1,0 +1,14 @@
+[33m32a3b8a[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32manomaly-detection[m[33m, [m[1;31morigin/anomaly-detection[m[33m)[m Fix lidar on 3D SLAM map and remove the use of IMU to rotate robot orientation on 3D map
+[33m038182d[m Edited app.py, index.html and lidar_udp_relay.py files to integrate IMU onto 3D SLAM environment
+[33md2fdd1e[m Edited app.py, index.html and lidar_udp_relay.py files to display 3D SLAM map
+[33m3a58208[m Added lidar udp relay, amended app.py and html UI code to display both camera and slam environment
+[33m68a8dae[m Made a UI that could live stream unitree's video feed by intercepting a UDP multicast video stream
+[33m8b0acf9[m Editted go2_stream_server.py with correct size and using QoS
+[33m1486b90[m Amended go2_stream_server.py to subscribe to topic frontvideostream
+[33m5418951[m Move app.py to project root and update streaming server config
+[33m3172344[m feat: add unitree_UI web dashboard module
+[33mc323f2b[m Update anomaly_detector to use YOLOv8 train-3 weights and update gitignore
+[33m9297d97[m Add a pre-trained test model from a github repo online, integrate to code and test
+[33me3bdd7e[m Added inference node and update setup.py file
+[33md27a91a[m Add working camera node publishing at ~14 FPS
+[33m7b03c53[m[33m ([m[1;31morigin/main[m[33m, [m[1;31morigin/autonomous-movement-and-mapping[m[33m, [m[1;31morigin/HEAD[m[33m, [m[1;32mmain[m[33m, [m[1;32mautonomous-movement-and-mapping[m[33m)[m Initial workspace structure for SIT robo dog capstone project
