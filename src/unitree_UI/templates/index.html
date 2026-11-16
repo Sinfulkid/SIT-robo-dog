@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Unitree Go2 Live Vision & SLAM</title>
+    <title>Unitree Go2 3D Vision & SLAM</title>
     <style>
         :root {
             --bg-color: #0d0f12;
@@ -29,10 +29,10 @@
         }
         .dashboard {
             display: grid;
-            grid-template-columns: 1.4fr 1fr;
+            grid-template-columns: 1.2fr 1.3fr;
             gap: 20px;
-            width: 95%;
-            max-width: 1400px;
+            width: 96%;
+            max-width: 1500px;
             margin-top: 20px;
         }
         .panel {
@@ -41,20 +41,40 @@
             border-radius: 12px;
             padding: 20px;
             box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            display: flex;
+            flex-direction: column;
         }
         .panel h2 {
             margin-top: 0;
             font-size: 18px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .hint {
+            font-size: 12px;
+            color: #94a3b8;
+            font-weight: normal;
         }
         .feed-box {
             width: 100%;
-            height: auto;
+            height: 480px;
+            object-fit: cover;
             border-radius: 8px;
             border: 2px solid #2d3748;
             display: block;
             background: #000;
         }
-        @media (max-width: 900px) {
+        #slam-3d-container {
+            width: 100%;
+            height: 480px;
+            border-radius: 8px;
+            border: 2px solid #2d3748;
+            overflow: hidden;
+            background: #14181f;
+            position: relative;
+        }
+        @media (max-width: 950px) {
             .dashboard {
                 grid-template-columns: 1fr;
             }
@@ -63,7 +83,7 @@
 </head>
 <body>
 
-    <h1>Unitree Go2 Vision & SLAM</h1>
+    <h1>Unitree Go2 3D Vision & SLAM</h1>
     <p>System Connection: <span style="color: var(--accent-color); font-weight: bold;">ONLINE</span></p>
 
     <div class="dashboard">
@@ -73,12 +93,123 @@
             <img class="feed-box" src="/video_feed" alt="Go2 Camera Feed" />
         </div>
 
-        <!-- RIGHT PANEL: Live SLAM / LiDAR Environment -->
+        <!-- RIGHT PANEL: 3D Height-Colored Voxel SLAM -->
         <div class="panel">
-            <h2>🧭 Live SLAM Environment (LiDAR)</h2>
-            <img class="feed-box" src="/slam_feed" alt="Go2 SLAM Map" />
+            <h2>
+                <span>🧭 3D SLAM Environment</span>
+                <span class="hint">Drag to Rotate • Scroll to Zoom</span>
+            </h2>
+            <div id="slam-3d-container"></div>
         </div>
     </div>
 
+    <!-- Local Offline Three.js & OrbitControls -->
+    <script src="https://cloudflare.com"></script> <!-- /static/js/three.min.js -->
+    <script src="https://jsdelivr.net"></script> <!-- /static/js/OrbitControl.js -->
+    <script>
+        const container = document.getElementById('slam-3d-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x181c24);
+        scene.fog = new THREE.FogExp2(0x181c24, 0.045);
+
+        const camera = new THREE.PerspectiveCamera(55, container.clientWidth / container.clientHeight, 0.1, 100);
+        camera.position.set(-3.2, 2.6, 0);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(container.clientWidth, container.clientHeight);
+        container.appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.target.set(1.5, 0.0, 0);
+        controls.enableDamping = true;
+        controls.update();
+
+        // Ground reference grid
+        const gridHelper = new THREE.GridHelper(20, 40, 0x3b4754, 0x262f3a);
+        gridHelper.position.y = -0.35;
+        scene.add(gridHelper);
+
+        // Simple 3D Go2 body representation at origin
+        const robotGroup = new THREE.Group();
+        const bodyMat = new THREE.MeshBasicMaterial({ color: 0x111111 });
+        const trimMat = new THREE.MeshBasicMaterial({ color: 0x00ff66 });
+        const body = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.18, 0.28), bodyMat);
+        const headStripe = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.19, 0.29), trimMat);
+        headStripe.position.x = 0.28;
+        robotGroup.add(body, headStripe);
+
+        // 4 legs
+        const legGeo = new THREE.BoxGeometry(0.06, 0.32, 0.06);
+        [[-0.24, -0.18, 0.11], [-0.24, -0.18, -0.11], [0.24, -0.18, 0.11], [0.24, -0.18, -0.11]].forEach(pos => {
+            const leg = new THREE.Mesh(legGeo, bodyMat);
+            leg.position.set(...pos);
+            robotGroup.add(leg);
+        });
+        scene.add(robotGroup);
+
+        // Instanced 3D Voxel Cubes (up to 20,000 voxels at 60 FPS)
+        const MAX_VOXELS = 20000;
+        const voxelGeo = new THREE.BoxGeometry(0.08, 0.08, 0.08);
+        const voxelMat = new THREE.MeshBasicMaterial();
+        const instancedMesh = new THREE.InstancedMesh(voxelGeo, voxelMat, MAX_VOXELS);
+        instancedMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+        scene.add(instancedMesh);
+
+        const dummy = new THREE.Object3D();
+        const color = new THREE.Color();
+
+        function setHeightColor(z, targetColor) {
+            const norm = Math.max(0, Math.min(1, (z + 0.35) / 1.65));
+            const hue = (0.38 - norm * 0.52 + 1.0) % 1.0;
+            targetColor.setHSL(hue, 0.95, 0.52);
+        }
+
+        async function fetchPointCloud() {
+            try {
+                const res = await fetch('/slam_points');
+                const buf = await res.arrayBuffer();
+                const floats = new Float32Array(buf);
+                const count = Math.min(MAX_VOXELS, Math.floor(floats.length / 3));
+
+                for (let i = 0; i < count; i++) {
+                    const rx = floats[i * 3];
+                    const ry = floats[i * 3 + 1];
+                    const rz = floats[i * 3 + 2];
+
+                    const vx = Math.round(rx / 0.08) * 0.08;
+                    const vy = Math.round(rz / 0.08) * 0.08;
+                    const vz = Math.round(-ry / 0.08) * 0.08;
+
+                    dummy.position.set(vx, vy, vz);
+                    dummy.updateMatrix();
+                    instancedMesh.setMatrixAt(i, dummy.matrix);
+
+                    setHeightColor(rz, color);
+                    instancedMesh.setColorAt(i, color);
+                }
+                instancedMesh.count = count;
+                instancedMesh.instanceMatrix.needsUpdate = true;
+                if (instancedMesh.instanceColor) instancedMesh.instanceColor.needsUpdate = true;
+            } catch (e) {
+                // Ignore transient hiccups
+            }
+            setTimeout(fetchPointCloud, 70);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        });
+
+        animate();
+        fetchPointCloud();
+    </script>
 </body>
 </html>
