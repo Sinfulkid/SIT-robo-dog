@@ -13,7 +13,7 @@ latest_slam_jpg = None
 slam_lock = threading.Lock()
 
 MAP_SIZE = 600
-SCALE = 50  # 50 pixels = 1 meter (covers 12m x 12m)
+SCALE = 200  # 50 pixels = 1 meter (covers 12m x 12m)
 slam_canvas = np.zeros((MAP_SIZE, MAP_SIZE, 3), dtype=np.uint8)
 
 

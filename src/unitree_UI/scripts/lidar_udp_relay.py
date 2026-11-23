@@ -8,6 +8,11 @@ from sensor_msgs.msg import PointCloud2
 LAPTOP_IP = "192.168.123.50"
 LAPTOP_PORT = 9876
 
+# Obstacle height slice (meters) and max points per UDP packet (3000 * 12 bytes = 36 KB)
+Z_MIN = 0.05
+Z_MAX = 1.40
+MAX_POINTS = 3000
+
 
 class LidarUdpRelay(Node):
     def __init__(self):
@@ -23,12 +28,13 @@ class LidarUdpRelay(Node):
         n = len(raw) // step
         if n == 0:
             return
+
         pts = np.frombuffer(raw, dtype=np.uint8).reshape(n, step)
         xyz = np.frombuffer(pts[:, :12].tobytes(), dtype=np.float32).reshape(n, 3)
 
-        # Keep obstacle height (0.10m to 1.50m) & cap to 1500 points so it fits in 1 UDP packet
-        mask = (xyz[:, 2] > 0.10) & (xyz[:, 2] < 1.50)
-        filtered = xyz[mask][::2][:1500].astype(np.float32)
+        mask = (xyz[:, 2] > Z_MIN) & (xyz[:, 2] < Z_MAX)
+        filtered = xyz[mask][:MAX_POINTS].astype(np.float32)
+
         if len(filtered) > 0:
             self.sock.sendto(filtered.tobytes(), (LAPTOP_IP, LAPTOP_PORT))
 
