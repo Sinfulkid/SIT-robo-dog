@@ -1,21 +1,23 @@
 import ipaddress
+import math
 import socket
 import sys
 from typing import List
 import numpy as np
 import rclpy
 from rclpy.node import Node
-from rclpy.qos import QoSProfile, ReliabilityPolicy
+from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
 from sensor_msgs.msg import PointCloud2
 
 DEFAULT_LAPTOP_IP = "192.168.123.50"
 LAPTOP_PORT = 9876
 
 # Obstacle height slice (meters) and max points per UDP packet (3000 * 12 bytes = 36 KB)
-Z_MIN = 0.05
-Z_MAX = 1.40
+Z_MIN = -1.0
+Z_MAX = 1.0
 MAX_POINTS = 3000
 LIDAR_INVERTED = True
+LIDAR_YAW_RAD = 0.5
 
 
 def parse_laptop_ip(argv: List[str], default_ip: str) -> str:
@@ -43,14 +45,21 @@ class LidarUdpRelay(Node):
         self.laptop_ip = laptop_ip
         self.laptop_port = laptop_port
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        qos = QoSProfile(depth=1, reliability=ReliabilityPolicy.RELIABLE)
+        qos = QoSProfile(
+            history=HistoryPolicy.KEEP_LAST,
+            depth=1,
+            reliability=ReliabilityPolicy.BEST_EFFORT,
+        )
         self.sub = self.create_subscription(PointCloud2, '/utlidar/cloud', self.cb, qos)
-        self.get_logger().info(f"Streaming /utlidar/cloud -> {self.laptop_ip}:{self.laptop_port}")
+        self.get_logger().info(
+            f"Streaming /utlidar/cloud (yaw={LIDAR_YAW_RAD:+.4f} rad, inverted={LIDAR_INVERTED}, "
+            f"z=[{Z_MIN}, {Z_MAX}]) -> {self.laptop_ip}:{self.laptop_port}"
+        )
 
     def cb(self, msg: PointCloud2):
         step = msg.point_step
         raw = bytes(msg.data)
-        n = len(raw) // step
+        n = len(raw) // step if step > 0 else 0
         if n == 0:
             return
 
@@ -62,9 +71,22 @@ class LidarUdpRelay(Node):
             xyz[:, 1] = -xyz[:, 1]
             xyz[:, 2] = -xyz[:, 2]
 
-        mask = (xyz[:, 2] > Z_MIN) & (xyz[:, 2] < Z_MAX)
-        filtered = xyz[mask][:MAX_POINTS].astype(np.float32)
+        # Apply yaw offset in the horizontal plane before height filtering
+        if LIDAR_YAW_RAD != 0.0:
+            c = math.cos(LIDAR_YAW_RAD)
+            s = math.sin(LIDAR_YAW_RAD)
+            x_rot = xyz[:, 0] * c - xyz[:, 1] * s
+            y_rot = xyz[:, 0] * s + xyz[:, 1] * c
+            xyz[:, 0] = x_rot
+            xyz[:, 1] = y_rot
 
+        mask = (
+            np.isfinite(xyz[:, 0])
+            & np.isfinite(xyz[:, 1])
+            & (xyz[:, 2] > Z_MIN)
+            & (xyz[:, 2] < Z_MAX)
+        )
+        filtered = xyz[mask][:MAX_POINTS].astype(np.float32)
         if len(filtered) > 0:
             self.sock.sendto(filtered.tobytes(), (self.laptop_ip, self.laptop_port))
 
@@ -89,4 +111,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
