@@ -1,6 +1,7 @@
 import ipaddress
 import socket
 import sys
+from typing import List
 import numpy as np
 import rclpy
 from rclpy.node import Node
@@ -17,7 +18,7 @@ MAX_POINTS = 3000
 LIDAR_INVERTED = True
 
 
-def parse_laptop_ip(argv: list[str], default_ip: str) -> str:
+def parse_laptop_ip(argv: List[str], default_ip: str) -> str:
     if len(argv) < 2:
         return default_ip
 
@@ -88,3 +89,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
